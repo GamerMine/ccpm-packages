@@ -1,0 +1,1 @@
+{"beep": {"description": "Emit a beep in an attached speaker", "versions": {"1.0.0": {"digest": "ec7f0384c331fff35daa2b3add0956c609aa9ae802c23410fea991a0b50742d1", "dependencies": []}}, "latest_version": "1.0.0"}}
