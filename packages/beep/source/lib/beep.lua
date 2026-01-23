@@ -17,6 +17,26 @@ function validate_args(speaker, freq, volume, duration)
     expect.range(duration, 0)
 end
 
+function setup_args(freq)
+    local freqs = {}
+    local incrs = {}
+    local indexes = {}
+
+    if type(freq) == "table" then
+        for i = 1, #freq do
+            incrs[i] = freq[i] / SAMPLE_RATE
+            freqs[i] = freq[i] / SAMPLE_RATE
+            indexes[i] = 0
+        end
+    else
+        freqs = { freq }
+        incrs = { freq / SAMPLE_RATE }
+        indexes = { 0 }
+    end
+
+    return freqs, incrs, indexes
+end
+
 --- Emit a beep through an attached speaker.
 --- @param speaker table: The speaker that should be used to play the beep
 --- @param freq number|table: The beep frequency/frequencies
@@ -25,21 +45,7 @@ end
 function beep.beep(speaker, freq, volume, duration)
     validate_args(speaker, freq, volume, duration)
     
-    local freqs = {}
-    local incrs = {}
-    local indexes = {}
-    if type(freq) == "table" then 
-        for i = 1, #freq do
-            incrs[i] = freq[i] / SAMPLE_RATE
-            freqs[i] = freq[i] / SAMPLE_RATE
-            indexes[i] = 0
-        end
-    else 
-        freqs = { freq }
-        incrs = { freq / SAMPLE_RATE }
-        indexes = { 0 }
-    end
-
+    local freqs, incrs, indexes = setup_args(freq)
     local dur = math.floor(SAMPLE_RATE * duration)
     local buff = {}
 
@@ -68,21 +74,7 @@ end
 function beep.sine(speaker, freq, volume, duration)
     validate_args(speaker, freq, volume, duration)
 
-    local freqs = {}
-    local incrs = {}
-    local indexes = {}
-    if type(freq) == "table" then 
-        for i = 1, #freq do
-            incrs[i] = freq[i] / SAMPLE_RATE
-            freqs[i] = freq[i] / SAMPLE_RATE
-            indexes[i] = 0
-        end
-    else 
-        freqs = { freq }
-        incrs = { freq / SAMPLE_RATE }
-        indexes = { 0 }
-    end
-
+    local freqs, incrs, indexes = setup_args(freq)
     local dur = math.floor(SAMPLE_RATE * duration)
     local buff = {}
 
@@ -111,6 +103,7 @@ end
 --- @param noise_type number: This value changes the noise sound, the value must be between 1 and 15 included.
 function beep.noise(speaker, freq, volume, duration, noise_type)
     validate_args(speaker, freq, volume, duration)
+    expect.expect(2, freq, "number")
     expect.expect(5, noise_type, "number")
     expect.range(noise_type, 1, 15)
     
@@ -133,6 +126,47 @@ function beep.noise(speaker, freq, volume, duration, noise_type)
     while not speaker.playAudio(buff) do
         os.pullEvent("speaker_audio_empty")
     end
+end
+
+beep.Audio = {}
+
+function beep.Audio:new(speakers)
+    local newAudio = {}
+    local volume = {}
+    setmetatable(newAudio, self)
+    self.__index = self
+
+    expect.expect(1, speakers, "table", "nil")
+
+    if type(speakers) == "table" then
+        local seen = {}
+        for i = 1, #speakers do
+            local name = getmetatable(speakers[i]).name
+            for j = 1, #seen do
+                if seen[j] == name then
+                    io.stderr:write("Duplicate speaker found.")
+                    return nil
+                end
+            end
+            seen[i] = name
+            volume[i] = 50
+        end
+    end
+
+    newAudio.speakers = speakers
+    newAudio.volumes = volume
+
+    return newAudio
+end
+
+function beep.Audio:setVolume(channel, newVolume)
+    expect.range(channel, 1, #self.speakers)
+    self.volumes[channel] = newVolume
+end
+
+function beep.Audio:playNote(channel, freq, duration)
+    expect.range(channel, 1, #self.speakers)
+    beep.sine(self.speakers[channel], freq, self.volumes[channel], duration)
 end
 
 return beep
