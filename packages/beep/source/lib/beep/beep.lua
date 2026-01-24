@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses>.
 --]]
 
-local expect = require("cc.expect")
+local exp = require("cc.expect")
 local w = require("/lib/beep/wave")
 
 --- @export
@@ -24,15 +24,28 @@ local beep = {}
 
 beep.SINE   = "sine"
 beep.SQUARE = "square"
-beep.NOISE  = "noise"
+beep.NOISE1  = "noise1"
+beep.NOISE2  = "noise2"
+beep.NOISE3  = "noise3"
+beep.NOISE4  = "noise4"
+beep.NOISE5  = "noise5"
+beep.NOISE6  = "noise6"
+beep.NOISE7  = "noise7"
 beep.VOLUME = "volume"
 
+local noises = {[beep.NOISE1]=3, [beep.NOISE2]=5, [beep.NOISE3]=6, [beep.NOISE4]=9, [beep.NOISE5]=10, [beep.NOISE6]=13, [beep.NOISE7]=15}
+
+--[[ Create a note structure. This should be used within notes data table. (see usage section of beep.Audio:playSong())
+    @param freq number: The note's frequency in Hertz.
+    @param duration number: The note's duration in seconds.
+    @param type string: The note's type. Can be beep.SQUARE, beep.SINE or beep.NOISE.
+-- ]]
 function beep.note(freq, duration, type)
-    expect.expect(1, freq, "number")
-    expect.range(freq, 0)
-    expect.expect(1, duration, "number")
-    expect.range(freq , 0)
-    expect.expect(1, type, "string")
+   exp.expect(1, freq, "number")
+   exp.range(freq, 0)
+   exp.expect(1, duration, "number")
+   exp.range(freq , 0)
+   exp.expect(1, type, "string")
 
     return {
         frequency = freq,
@@ -41,9 +54,12 @@ function beep.note(freq, duration, type)
     }
 end
 
+--[[ Create a volume structure. This should be used within notes data table. (see usage section of beep.Audio:playSong())
+    @param volume number: The new volume to be set.
+-- ]]
 function beep.volume(volume)
-    expect.expect(1, volume, "number")
-    expect.range(volume, 0, 127)
+   exp.expect(1, volume, "number")
+   exp.range(volume, 0, 127)
 
     return {
         volume = volume,
@@ -69,7 +85,7 @@ function beep.Audio:new(speakers)
     setmetatable(newAudio, self)
     self.__index = self
 
-    expect.expect(1, speakers, "table", "nil")
+   exp.expect(1, speakers, "table", "nil")
 
     if type(speakers) == "table" then
         local seen = {}
@@ -94,26 +110,27 @@ function beep.Audio:new(speakers)
 end
 
 --[[ Set the volume of a channel.
-    @param channel number: The channel's number
-    @param newVolume number: The new channel's volume (must be between 0 and 127 included)
+     On Audio playback object creation, the volume is set to 50
+    @param channel number: The channel's number.
+    @param newVolume number: The new channel's volume (must be between 0 and 127 included).
     @usage Set the volume of channel 1.
 
         local audio = beep.Audio:new({spk1, spk2, spk3})
 
-        audio:setVolume(1, 50)
+        audio:setVolume(1, 100)
 --]]
 function beep.Audio:setVolume(channel, newVolume)
-    expect.expect(1, channel, "number")
-    expect.range(channel, 1, self.nbChannels)
-    expect.expect(2, newVolume, "number")
-    expect.range(newVolume, 0, 127)
+   exp.expect(1, channel, "number")
+   exp.range(channel, 1, self.nbChannels)
+   exp.expect(2, newVolume, "number")
+   exp.range(newVolume, 0, 127)
     
     self.volumes[channel] = newVolume
 end
 
 --[[ Plays a note on a specific channel.
-    @param channel number: The channel's number 
-    @param note table: A table containing the note to be played
+    @param channel number: The channel's number.
+    @param note table: A table containing the note to be played.
     @usage Create a note and play it on channel 1.
 
         local audio = beep.Audio:new({spk1, spk2, spk3})
@@ -122,9 +139,9 @@ end
         audio:playNote(1, note)
 --]]
 function beep.Audio:playNote(channel, note)
-    expect.expect(1, channel, "number")
-    expect.range(channel, 1, self.nbChannels)
-    expect.expect(2, note, "table")
+   exp.expect(1, channel, "number")
+   exp.range(channel, 1, self.nbChannels)
+   exp.expect(2, note, "table")
 
     local spk = self.speakers[channel]
     local volume = self.volumes[channel]
@@ -133,16 +150,16 @@ function beep.Audio:playNote(channel, note)
         w.sine(spk, note.frequency, volume, note.duration)
     elseif note.type == beep.SQUARE then
         w.square(spk, note.frequency, volume, note.duration)
-    elseif note.type == beep.NOISE then
-        w.noise(spk, note.frequency, volume, note.duration, 1)
+    elseif string.find(note.type, "noise") ~= nil then
+        w.noise(spk, note.frequency, volume, note.duration, noises[note.type])
     else
         print(string.format("Type %s does not exists!", note.type))
     end
 end
 
 --[[ Plays notes loaded into the data table for one channel.
-    @param channel number: The channel's number 
-    @param data table: A table containing the notes for each channels to be played
+    @param channel number: The channel's number.
+    @param data table: A table containing the notes for each channels to be played.
     @usage Create a note data table containing data for one channel and play it on channel 1.
 
         local audio = beep.Audio:new({spk1, spk2, spk3})
@@ -153,9 +170,9 @@ end
         audio:playChannel(1, data)
 --]]
 function beep.Audio:playChannel(channel, data)
-    expect.expect(1, channel, "number")
-    expect.range(channel, 0, self.nbChannels)
-    expect.expect(2, data, "table")
+   exp.expect(1, channel, "number")
+   exp.range(channel, 0, self.nbChannels)
+   exp.expect(2, data, "table")
     
     for i=1, #data do
         local note = data[i]
@@ -171,8 +188,8 @@ function beep.Audio:playChannel(channel, data)
 end
 
 --[[ Plays a song from a data table loaded with notes associated to channels numbers.
-     This will play the notes for each channel simultaneously
-    @param data table: A table containing the notes for each channels to be played
+     This will play the notes for each channel simultaneously.
+    @param data table: A table containing the notes for each channels to be played.
     @usage Create a note data table containing data for channel 1 and 3 and play it.
 
         local audio = beep.Audio:new({spk1, spk2, spk3})
@@ -189,7 +206,7 @@ end
         audio:playSong(data)
 --]]
 function beep.Audio:playSong(data)
-    expect.expect(1, data, "table")
+   exp.expect(1, data, "table")
 
     local fns = {}
     for i = 1, self.nbChannels do
