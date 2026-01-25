@@ -22,7 +22,7 @@ function wave.square(speaker, freq, duration)
         squareIndex = (squareIndex + incr) % 1
 
         table.insert(speaker.buffer, sample)
-        if #speaker.buffer > 16*1024 then wave.play(speaker) end
+        if #speaker.buffer > 4*1024 then wave.play(speaker) end
     end
     wave.play(speaker)
 end
@@ -38,7 +38,7 @@ function wave.sine(speaker, freq, duration)
         sineIndex = (sineIndex + incr) % 1
 
         table.insert(speaker.buffer, sample)
-        if #speaker.buffer > 16*1024 then wave.play(speaker) end
+        if #speaker.buffer > 4*1024 then wave.play(speaker) end
     end
     wave.play(speaker)
 end
@@ -57,7 +57,7 @@ function wave.noise(speaker, freq, duration, noise_type)
         if prev_index < 0.5 and index >= 0.5 then
             poly_16 = bit.bor(bit.blshift(bit.bxor(bit.band(bit.brshift(poly_16, noise_type), 1), bit.band(poly_16, 1)), 15), bit.brshift(poly_16, 1))
         end
-        if #speaker.buffer > 16*1024 then wave.play(speaker) end
+        if #speaker.buffer > 4*1024 then wave.play(speaker) end
     end
     wave.play(speaker)
 end
