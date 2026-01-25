@@ -209,8 +209,6 @@ function beep.Audio:playChannel(channel, data)
         self:playNote(channel, note)
         ::continue::
     end
-
-    w.tryPlay(self.speakers[channel], true)
 end
 
 --[[ Plays a song from a data table loaded with notes associated to channels numbers.
