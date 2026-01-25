@@ -24,13 +24,13 @@ local beep = {}
 
 beep.SINE   = "sine"
 beep.SQUARE = "square"
-beep.NOISE1  = "noise1"
-beep.NOISE2  = "noise2"
-beep.NOISE3  = "noise3"
-beep.NOISE4  = "noise4"
-beep.NOISE5  = "noise5"
-beep.NOISE6  = "noise6"
-beep.NOISE7  = "noise7"
+beep.NOISE1 = "noise1"
+beep.NOISE2 = "noise2"
+beep.NOISE3 = "noise3"
+beep.NOISE4 = "noise4"
+beep.NOISE5 = "noise5"
+beep.NOISE6 = "noise6"
+beep.NOISE7 = "noise7"
 beep.VOLUME = "volume"
 
 local noises = {[beep.NOISE1]=3, [beep.NOISE2]=5, [beep.NOISE3]=6, [beep.NOISE4]=9, [beep.NOISE5]=10, [beep.NOISE6]=13, [beep.NOISE7]=15}
@@ -43,14 +43,39 @@ local noises = {[beep.NOISE1]=3, [beep.NOISE2]=5, [beep.NOISE3]=6, [beep.NOISE4]
 function beep.note(freq, duration, type)
    exp.expect(1, freq, "number")
    exp.range(freq, 0)
-   exp.expect(1, duration, "number")
+   exp.expect(2, duration, "number")
    exp.range(freq , 0)
-   exp.expect(1, type, "string")
+   exp.expect(3, type, "string")
 
     return {
         frequency = freq,
         duration  = duration,
         type      = type
+    }
+end
+
+--[[ Create a fade in/out note structure. This should be used within notes data table. (see usage section of beep.Audio:playSong())
+     The fading direction will be computed at runtime, i.e: if the target volume is lower than the current volume, the note will fade
+     in otherwise it will fade out.
+    @param freq number: The note's frequency in Hertz.
+    @param duration number: The note's duration in seconds.
+    @param type string: The note's type. Can be beep.SQUARE, beep.SINE or beep.NOISE.
+    @param targetVolume number: The target fade in/out volume.
+-- ]]
+function beep.fnote(freq, duration, type, targetVolume)
+    exp.expect(1, freq, "number")
+    exp.range(freq, 0)
+    exp.expect(2, duration, "number")
+    exp.range(freq , 0)
+    exp.expect(3, type, "string")
+    exp.expect(4, targetVolume)
+    exp.range(targetVolume, 0, 127)
+
+    return {
+        frequency  = freq,
+        duration   = duration,
+        type       = type,
+        fadeTarget = targetVolume
     }
 end
 
@@ -98,13 +123,13 @@ function beep.Audio:new(speakers)
                 end
             end
             seen[i] = name
-            volume[i] = 50
+            speakers[i]["volume"] = 50
+            speakers[i]["buffer"] = {}
         end
     end
 
     newAudio.nbChannels = #speakers
     newAudio.speakers = speakers
-    newAudio.volumes = volume
 
     return newAudio
 end
@@ -125,7 +150,7 @@ function beep.Audio:setVolume(channel, newVolume)
    exp.expect(2, newVolume, "number")
    exp.range(newVolume, 0, 127)
     
-    self.volumes[channel] = newVolume
+    self.speakers[channel].volume = newVolume
 end
 
 --[[ Plays a note on a specific channel.
@@ -144,14 +169,13 @@ function beep.Audio:playNote(channel, note)
    exp.expect(2, note, "table")
 
     local spk = self.speakers[channel]
-    local volume = self.volumes[channel]
     
     if note.type == beep.SINE then
-        w.sine(spk, note.frequency, volume, note.duration)
+        w.sine(spk, note.frequency, note.duration)
     elseif note.type == beep.SQUARE then
-        w.square(spk, note.frequency, volume, note.duration)
+        w.square(spk, note.frequency, note.duration)
     elseif string.find(note.type, "noise") ~= nil then
-        w.noise(spk, note.frequency, volume, note.duration, noises[note.type])
+        w.noise(spk, note.frequency, note.duration, noises[note.type])
     else
         print(string.format("Type %s does not exists!", note.type))
     end
@@ -170,10 +194,10 @@ end
         audio:playChannel(1, data)
 --]]
 function beep.Audio:playChannel(channel, data)
-   exp.expect(1, channel, "number")
-   exp.range(channel, 0, self.nbChannels)
-   exp.expect(2, data, "table")
-    
+    exp.expect(1, channel, "number")
+    exp.range(channel, 0, self.nbChannels)
+    exp.expect(2, data, "table")
+  
     for i=1, #data do
         local note = data[i]
 
@@ -185,6 +209,8 @@ function beep.Audio:playChannel(channel, data)
         self:playNote(channel, note)
         ::continue::
     end
+
+    w.tryPlay(self.speakers[channel], true)
 end
 
 --[[ Plays a song from a data table loaded with notes associated to channels numbers.
@@ -220,3 +246,8 @@ end
 
 return beep
     
+--[[
+    TODO: #1 Add fade in/out.
+    TODO: #3 Add vibrato (repeated, fast change of frequency over time), with depth and rate paramters.
+    TODO: #4 Add looping with startLoop() and endLoop(). Parsing should be done before playing to prevent timing issues while playing.
+-- ]]

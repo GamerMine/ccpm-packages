@@ -3,6 +3,6 @@
     "license": "AGPL-3.0-or-later",
     "authors": ["GamerMine <gamermine@dwightstudio.fr>"],
     "maintainers": ["GamerMine <gamermine@dwightstudio.fr>"],
-    "version": "2.0.0",
+    "version": "2.1.0",
     "dependencies": []
 }
