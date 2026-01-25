@@ -68,7 +68,7 @@ function beep.fnote(freq, duration, type, targetVolume)
     exp.expect(2, duration, "number")
     exp.range(freq , 0)
     exp.expect(3, type, "string")
-    exp.expect(4, targetVolume)
+    exp.expect(4, targetVolume, "number")
     exp.range(targetVolume, 0, 127)
 
     return {
@@ -89,6 +89,21 @@ function beep.volume(volume)
     return {
         volume = volume,
         type   = beep.VOLUME
+    }
+end
+
+function beep.startLoop(count)
+    exp.expect(1, count, "number")
+    
+    return {
+        type = beep.START_LOOP,
+        loopCount = count
+    }
+end
+
+function beep.endLoop()
+    return {
+        type = beep.END_LOOP
     }
 end
 
@@ -171,11 +186,11 @@ function beep.Audio:playNote(channel, note)
     local spk = self.speakers[channel]
     
     if note.type == beep.SINE then
-        w.sine(spk, note.frequency, note.duration)
+        w.sine(spk, note.frequency, note.duration, note.fadeTarget)
     elseif note.type == beep.SQUARE then
-        w.square(spk, note.frequency, note.duration)
+        w.square(spk, note.frequency, note.duration, note.fadeTarget)
     elseif string.find(note.type, "noise") ~= nil then
-        w.noise(spk, note.frequency, note.duration, noises[note.type])
+        w.noise(spk, note.frequency, note.duration, noises[note.type], note.fadeTarget)
     else
         print(string.format("Type %s does not exists!", note.type))
     end
@@ -197,6 +212,15 @@ function beep.Audio:playChannel(channel, data)
     exp.expect(1, channel, "number")
     exp.range(channel, 0, self.nbChannels)
     exp.expect(2, data, "table")
+
+    -- First parsing pass
+    for i=1, #data do
+        local note = data[i]
+
+        if note.type == beep.START_LOOP then
+            
+        end
+    end
   
     for i=1, #data do
         local note = data[i]
@@ -245,7 +269,7 @@ end
 return beep
     
 --[[
-    TODO: #1 Add fade in/out.
     TODO: #3 Add vibrato (repeated, fast change of frequency over time), with depth and rate paramters.
     TODO: #4 Add looping with startLoop() and endLoop(). Parsing should be done before playing to prevent timing issues while playing.
+    TODO: #6 Add frequency shift to a target frequency over time (duration)
 -- ]]
