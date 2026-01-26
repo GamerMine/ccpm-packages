@@ -32,10 +32,12 @@ beep.NOISE5 = "noise5"
 beep.NOISE6 = "noise6"
 beep.NOISE7 = "noise7"
 beep.VOLUME = "volume"
+beep.START_LOOP = "start_loop"
+beep.END_LOOP = "end_loop"
 
 local noises = {[beep.NOISE1]=3, [beep.NOISE2]=5, [beep.NOISE3]=6, [beep.NOISE4]=9, [beep.NOISE5]=10, [beep.NOISE6]=13, [beep.NOISE7]=15}
 
---[[ Create a note structure. This should be used within notes data table. (see usage section of beep.Audio:playSong())
+--[[ Creates a note structure. This should be used within notes data table. (see usage section of beep.Audio:playSong())
     @param freq number: The note's frequency in Hertz.
     @param duration number: The note's duration in seconds.
     @param type string: The note's type. Can be beep.SQUARE, beep.SINE or beep.NOISE.
@@ -54,7 +56,7 @@ function beep.note(freq, duration, type)
     }
 end
 
---[[ Create a fade in/out note structure. This should be used within notes data table. (see usage section of beep.Audio:playSong())
+--[[ Creates a fade in/out note structure. This should be used within notes data table. (see usage section of beep.Audio:playSong())
      The fading direction will be computed at runtime, i.e: if the target volume is lower than the current volume, the note will fade
      in otherwise it will fade out.
     @param freq number: The note's frequency in Hertz.
@@ -79,7 +81,7 @@ function beep.fnote(freq, duration, type, targetVolume)
     }
 end
 
---[[ Create a volume structure. This should be used within notes data table. (see usage section of beep.Audio:playSong())
+--[[ Creates a volume structure. This should be used within notes data table. (see usage section of beep.Audio:playSong())
     @param volume number: The new volume to be set.
 -- ]]
 function beep.volume(volume)
@@ -92,6 +94,21 @@ function beep.volume(volume)
     }
 end
 
+--[[ Creates a loop start structure. This should be used within notes data table. (see usage section of beep.Audio:playSong())
+     startLoop() must be followed by it's associated endLoop().
+    @param count number: Loop iterations count
+    @usage Create a loop of notes.
+
+        local data = {
+            [1]={
+                beep.volume(10),
+                beep.startLoop(10), -- Here the content between startLoop(10) and endLoop() will be repeated 10 times.
+                beep.note(1000, 0.5, beep.SQUARE),
+                beep.note(2000, 0.5, beep.SQUARE),
+                beep.endLoop()
+            }
+        }
+-- ]]
 function beep.startLoop(count)
     exp.expect(1, count, "number")
     
@@ -101,6 +118,10 @@ function beep.startLoop(count)
     }
 end
 
+--[[ Creates a loop end structure. This should be used within notes data table. (see usage section of beep.Audio:playSong())
+     endLoop() must be preceded by it's associated startLoop().
+     @usage See startLoop().
+-- ]]
 function beep.endLoop()
     return {
         type = beep.END_LOOP
@@ -121,7 +142,6 @@ beep.Audio = {}
 -- ]]
 function beep.Audio:new(speakers)
     local newAudio = {}
-    local volume = {}
     setmetatable(newAudio, self)
     self.__index = self
 
@@ -203,7 +223,7 @@ end
 
         local audio = beep.Audio:new({spk1, spk2, spk3})
         local data = {            
-            beep.volume(20)
+            beep.volume(20),
             beep.note(440, 1, beep.SQUARE)
         }
         audio:playChannel(1, data)
@@ -213,15 +233,6 @@ function beep.Audio:playChannel(channel, data)
     exp.range(channel, 0, self.nbChannels)
     exp.expect(2, data, "table")
 
-    -- First parsing pass
-    for i=1, #data do
-        local note = data[i]
-
-        if note.type == beep.START_LOOP then
-            
-        end
-    end
-  
     for i=1, #data do
         local note = data[i]
 
@@ -243,11 +254,11 @@ end
         local audio = beep.Audio:new({spk1, spk2, spk3})
         local data = {
             [1]={
-                beep.volume(20)
+                beep.volume(20),
                 beep.note(440, 1, beep.SQUARE)
             }
             [3]={
-                beep.volume(60)
+                beep.volume(60),
                 beep.note(880, 1, beep.SINE)
             }
         }
@@ -259,17 +270,58 @@ function beep.Audio:playSong(data)
     local fns = {}
     for i = 1, self.nbChannels do
         if data[i] then
-            table.insert(fns, function() self:playChannel(i, data[i]) end)
+            local parsed = parseChannel(i, data[i])
+            if parsed then
+                table.insert(fns, function() self:playChannel(i, parsed) end)
+            else
+                return
+            end
         end
     end
     
     parallel.waitForAll(table.unpack(fns))
 end
 
-return beep
+function parseChannel(channel, data)
+    local parsed = {}
+    local callStack = {}
     
+    for i=1, #data do
+        local note = data[i]
+
+        if note.type == beep.START_LOOP then
+            table.insert(callStack, {startIndex=#parsed + 1, loopCount=note.loopCount, line=i})
+        elseif note.type == beep.END_LOOP then
+            if #callStack == 0 then
+                io.stderr:write(string.format("Error in channel %d: Too many endLoop() or missing startLoop() at line %d.\n", channel, i))
+                return
+            end
+            local loop = table.remove(callStack)
+
+            for j=1, loop.loopCount-1 do
+                for k=loop.startIndex, #parsed do
+                    table.insert(parsed, parsed[k])
+                end
+            end
+        else
+            table.insert(parsed, data[i])
+        end
+    end
+
+    if #callStack ~= 0 then
+        for i=1, #callStack do
+            local call = callStack[i]
+            io.stderr:write(string.format("Error in channel %d: missing endLoop() for loop at line %d.\n", channel, call.line))
+        end
+        return
+    end
+
+    return parsed    
+end
+
+return beep
+
 --[[
     TODO: #3 Add vibrato (repeated, fast change of frequency over time), with depth and rate paramters.
-    TODO: #4 Add looping with startLoop() and endLoop(). Parsing should be done before playing to prevent timing issues while playing.
     TODO: #6 Add frequency shift to a target frequency over time (duration)
 -- ]]
